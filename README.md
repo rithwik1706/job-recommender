@@ -8,6 +8,14 @@
 
 ---
 
+## Live Preview
+
+* Open the deployed app:
+
+  * https://job-recommender-socu.onrender.com
+
+---
+
 ## Requirements
 
 * Python 3.10+
