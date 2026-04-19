@@ -8,34 +8,20 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [suggestions, setSuggestions] = useState([]);
   const [filtered, setFiltered] = useState([]);
-const cleanText = (text) => {
-  if (!text) return "N/A";
 
-  const str = text.toString();
+  const cleanText = (text) => {
+    if (!text) return "N/A";
+    if (text.length > 50) return "N/A";
+    return text;
+  };
 
-  // Remove long garbage text
-  if (str.length > 60) return "N/A";
-
-  // Remove unwanted phrases
-  const badWords = ["demonstrated", "proficiency", "communication", "detail"];
-
-  for (let word of badWords) {
-    if (str.toLowerCase().includes(word)) {
-      return "N/A";
-    }
-  }
-
-  return str;
-};
-  // 🔥 Fetch suggestions
+  // Fetch suggestions
   useEffect(() => {
-    axios
-      .get("http://localhost:5000/skills")
-      .then((res) => setSuggestions(res.data))
-      .catch((err) => console.log(err));
+    axios.get("/skills")
+      .then(res => setSuggestions(res.data))
+      .catch(err => console.log(err));
   }, []);
 
-  // 🔥 Handle typing
   const handleChange = (e) => {
     const value = e.target.value;
     setSkills(value);
@@ -47,20 +33,15 @@ const cleanText = (text) => {
     setFiltered(filteredSuggestions.slice(0, 5));
   };
 
-  // 🔥 Submit
   const handleSubmit = async (e) => {
     e.preventDefault();
-
     if (!skills.trim()) return;
 
     setLoading(true);
     setResults([]);
 
     try {
-      const res = await axios.post("http://localhost:5000/predict", {
-        skills: skills,
-      });
-
+      const res = await axios.post("/predict", { skills });
       setResults(res.data.results);
     } catch (err) {
       console.error(err);
@@ -78,11 +59,10 @@ const cleanText = (text) => {
           type="text"
           value={skills}
           onChange={handleChange}
-          placeholder="Enter skills (Python, ML, React...)"
+          placeholder="Enter skills (Python, React, SQL...)"
           className="input"
         />
 
-        {/* 🔥 Suggestions Dropdown */}
         {filtered.length > 0 && (
           <div className="suggestions">
             {filtered.map((item, i) => (
@@ -106,7 +86,6 @@ const cleanText = (text) => {
         </button>
       </form>
 
-      {/* 🔥 Spinner */}
       {loading && <div className="spinner"></div>}
 
       <div className="results">
@@ -115,47 +94,35 @@ const cleanText = (text) => {
         {results.map((job, i) => (
           <div key={i} className="card">
             <h3>{job.title}</h3>
-            <p><b>Company:</b> {job.company}</p>
-            <p><b>Location:</b> {job.location}</p>
+            <p><b>Company:</b> {cleanText(job.company)}</p>
+            <p><b>Location:</b> {cleanText(job.location)}</p>
 
-            {/* 📊 Similarity Bar */}
             <div className="barContainer">
-              <div
-                className="bar"
-                style={{ width: `${job.score * 100}%` }}
-              ></div>
+              <div className="bar" style={{ width: `${job.score * 100}%` }}></div>
             </div>
+
             <p>Score: {job.score}</p>
 
-            {/* ✅ Matched Skills */}
             <p><b>Matched Skills:</b></p>
             <div>
               {job.matched_skills.map((s, idx) => (
-                <span key={idx} className="chip green">
-                  {s}
-                </span>
+                <span key={idx} className="chip green">{s}</span>
               ))}
             </div>
 
-            {/* ❌ Missing Skills */}
             <p><b>Missing Skills:</b></p>
             <div>
               {job.missing_skills.map((s, idx) => (
-                <span key={idx} className="chip red">
-                  {s}
-                </span>
+                <span key={idx} className="chip red">{s}</span>
               ))}
             </div>
 
-            {/* 📚 Learning Suggestions */}
             {job.learning.length > 0 && (
               <>
                 <p><b>📚 Learning Path:</b></p>
                 <div>
                   {job.learning.map((l, idx) => (
-                    <span key={idx} className="chip blue">
-                      {l}
-                    </span>
+                    <span key={idx} className="chip blue">{l}</span>
                   ))}
                 </div>
               </>

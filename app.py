@@ -1,11 +1,12 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import joblib
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
 import re
+import os
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder="build", static_url_path="")
 CORS(app)
 
 print("Loading model + data...")
@@ -36,9 +37,11 @@ COMMON_SKILLS = {
 def extract_skills(text):
     text = text.lower()
     found = set()
+
     for skill in COMMON_SKILLS:
         if re.search(rf"\b{re.escape(skill)}\b", text):
             found.add(skill)
+
     return found
 
 # ---------------------------------------------------
@@ -55,7 +58,7 @@ def get_skill_match(user_text, job_text):
     return matched, missing
 
 # ---------------------------------------------------
-# 🔥 CLEAN COMPANY
+# 🔥 CLEAN COMPANY & LOCATION
 # ---------------------------------------------------
 
 def get_company(row):
@@ -72,9 +75,6 @@ def get_company(row):
 
     return company
 
-# ---------------------------------------------------
-# 🔥 CLEAN LOCATION
-# ---------------------------------------------------
 
 def get_location(row):
     location = str(row.get("location", "")).strip()
@@ -110,7 +110,7 @@ def get_learning_resources(skills):
     return list({resources[s] for s in skills if s in resources})[:3]
 
 # ---------------------------------------------------
-# 🚀 FINAL PREDICT
+# 🚀 PREDICT API
 # ---------------------------------------------------
 
 @app.route("/predict", methods=["POST"])
@@ -121,10 +121,9 @@ def predict():
     if not user_input:
         return jsonify({"results": []})
 
-    # Clean input
     user_input_clean = re.sub(r'[^a-zA-Z ]', ' ', user_input.lower())
 
-    # 🔥 Expand if only 1 skill (important fix)
+    # Expand single skill input
     if len(user_input_clean.split()) == 1:
         user_input_clean += " programming development backend"
 
@@ -144,22 +143,16 @@ def predict():
         if key in seen:
             continue
 
-        job_text = (
-            str(row["title"]) + " " +
-            str(row.get("description", ""))
-        ).lower()
+        job_text = str(row["title"]).lower()
 
         matched, missing = get_skill_match(user_input_clean, job_text)
 
-        # ❌ Skip totally irrelevant
         if len(matched) == 0:
             continue
 
-        # 🔥 Hybrid scoring
         boost = len(matched) * 0.1
         final_score = base_score + boost
 
-        # ❌ Filter weak
         if final_score < 0.7:
             continue
 
@@ -175,7 +168,6 @@ def predict():
 
         seen.add(key)
 
-    # Sort results
     candidates = sorted(candidates, key=lambda x: x["score"], reverse=True)
 
     return jsonify({"results": candidates[:5]})
@@ -187,6 +179,18 @@ def predict():
 @app.route("/skills", methods=["GET"])
 def skills():
     return jsonify(list(COMMON_SKILLS))
+
+# ---------------------------------------------------
+# 🎨 SERVE REACT
+# ---------------------------------------------------
+
+@app.route("/", defaults={"path": ""})
+@app.route("/<path:path>")
+def serve(path):
+    if path != "" and os.path.exists("build/" + path):
+        return send_from_directory("build", path)
+    else:
+        return send_from_directory("build", "index.html")
 
 
 if __name__ == "__main__":
